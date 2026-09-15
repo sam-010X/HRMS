@@ -212,14 +212,11 @@ if company is None:
 # HEADER
 # --------------------------------------------------
 
-st.write("Current directory:", os.getcwd())
-st.write("Files:", os.listdir("."))
-st.write("Pages:", os.listdir("pages"))
 c1, c2, c3 = st.columns([1,6,1])
 
 with c1:
     if st.button("⬅ Back"):
-        st.switch_page("pages/2_View_companies.py")
+        st.switch_page("pages/2_View_Companies.py")
 
 with c2:
     st.markdown(f"# {company['company_name']}")

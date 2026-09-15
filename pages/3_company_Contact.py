@@ -22,8 +22,10 @@ div[data-testid="stButton"] button[kind="secondary"]:hover {
 </style>
 """, unsafe_allow_html=True)
 
-SUPABASE_URL = "https://lbiioyctwrwxwwbnaewa.supabase.co"
-SUPABASE_KEY = "sb_publishable_4ASf43j7RR3rE2c-DumiIg_4Tc5UvqH"
+
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 

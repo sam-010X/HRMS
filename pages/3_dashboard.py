@@ -49,7 +49,6 @@ def get_total_companies():
 
 total_companies = get_total_companies()
 
-st.metric("Total Companies", total_companies)
 @st.cache_data(ttl=300)
 def get_contact_counts():
     unique_dins = set()

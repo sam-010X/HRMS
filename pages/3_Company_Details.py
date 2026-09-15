@@ -409,7 +409,7 @@ with col2:
             def get_directors():
                 contacts = []
                 start = 0
-                batch_size = 300
+                batch_size = 500
 
                 while True:
                     response = (

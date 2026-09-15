@@ -2,6 +2,7 @@ import streamlit as st
 from supabase import create_client
 from utils.contact_dialog import edit_contact,show_contact,whastapp
 import base64
+import os
 st.markdown("""
 <style>
 

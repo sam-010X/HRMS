@@ -211,6 +211,9 @@ if company is None:
 # HEADER
 # --------------------------------------------------
 
+st.write("Current directory:", os.getcwd())
+st.write("Files:", os.listdir("."))
+st.write("Pages:", os.listdir("pages"))
 c1, c2, c3 = st.columns([1,6,1])
 
 with c1:

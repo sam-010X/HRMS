@@ -39,6 +39,7 @@ references_response = (
     supabase
     .table("company_contacts")
     .select("reference")
+    .range(0, 9999)
     .execute()
 )
 

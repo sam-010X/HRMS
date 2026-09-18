@@ -35,21 +35,12 @@ PAGE_SIZE = st.selectbox(
     [25, 50, 100, 200]
 )
 
-references_response = (
-    supabase
-    .table("company_contacts")
-    .select("reference")
-    .execute()
-)
+references_response = supabase.rpc("get_contact_references").execute()
 
-references = sorted(
-    {
-        str(row["reference"]).strip()
-        for row in (references_response.data or [])
-        if row.get("reference") is not None
-        and str(row["reference"]).strip()
-    }
-)
+references = [
+    row["reference"]
+    for row in (references_response.data or [])
+]
 
 selected_reference = st.selectbox(
     "Reference",

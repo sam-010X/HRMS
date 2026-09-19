@@ -209,18 +209,18 @@ def show_contact(contact):
 
     st.subheader(contact["name"])
 
-    din = contact.get("din")
+    name = contact.get("name")
 
     company_rows = []
 
-    if din is not None:
-        din = str(din).strip()
+    if name is not None:
+        name = str(name).strip()
 
         company_response = (
             supabase
             .table("visual_table")
             .select("*")
-            .eq("din", din)
+            .eq("director_name", name)
             .execute()
         )
 
@@ -295,7 +295,7 @@ def show_contact(contact):
 
     with tab4:
 
-        st.write(f"**DIN:** {din or '-'}")
+        st.write(f"**NAME:** {name or '-'}")
 
         if not company_rows:
             st.info("No companies found for this DIN.")
@@ -319,7 +319,6 @@ def show_contact(contact):
                     """,
                     unsafe_allow_html=True
                 )
-
 
 @st.dialog("Whatsapp Message", width="medium")
 def whastapp(contact,company_name):

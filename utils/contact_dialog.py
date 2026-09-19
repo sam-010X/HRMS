@@ -298,7 +298,7 @@ def show_contact(contact):
         st.write(f"**NAME:** {name or '-'}")
 
         if not company_rows:
-            st.info("No companies found for this DIN.")
+            st.info("No companies found for this Name.")
         else:
             st.write(f"**Companies:** {len(company_rows)}")
 

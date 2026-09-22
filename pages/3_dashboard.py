@@ -167,229 +167,229 @@ st.dataframe(
     hide_index=True
 )
 
-# st.title("WhatsApp Message Dashboard")
+st.title("WhatsApp Message Dashboard")
 
-# data = (
-#     supabase
-#     .table("whatsapp_message_logs")
-#     .select("*")
-#     .execute()
-#     .data
-# )
+data = (
+    supabase
+    .table("whatsapp_message_logs")
+    .select("*")
+    .execute()
+    .data
+)
 
-# df = pd.DataFrame(data)
+df = pd.DataFrame(data)
 
-# if df.empty:
-#     st.warning("No message data available.")
-#     st.stop()
+if df.empty:
+    st.warning("No message data available.")
+    st.stop()
 
-# df["sent_at"] = pd.to_datetime(
-#     df["sent_at"],
-#     errors="coerce"
-# )
+df["sent_at"] = pd.to_datetime(
+    df["sent_at"],
+    errors="coerce"
+)
 
-# df["Read_status"] = (
-#     df["Read_status"]
-#     .fillna("Unknown")
-#     .astype(str)
-#     .str.upper()
-# )
-
-
-
-# df["template_name"] = (
-#     df["template_name"]
-#     .fillna("Unknown")
-#     .astype(str)
-# )
-
-# st.markdown("""
-# <style>
-# .metric-card {
-#     padding: 20px;
-#     border-radius: 12px;
-#     background-color: #f7f7f7;
-#     border: 1px solid #e5e5e5;
-# }
-# .metric-title {
-#     font-size: 14px;
-#     color: #666;
-# }
-# .metric-value {
-#     font-size: 30px;
-#     font-weight: 700;
-# }
-# </style>
-# """, unsafe_allow_html=True)
-
-# st.sidebar.header("Filters")
+df["Read_status"] = (
+    df["Read_status"]
+    .fillna("Unknown")
+    .astype(str)
+    .str.upper()
+)
 
 
-# templates = sorted(df["template_name"].unique())
 
-# selected_templates = st.sidebar.multiselect(
-#     "Template",
-#     templates,
-#     default=templates
-# )
+df["template_name"] = (
+    df["template_name"]
+    .fillna("Unknown")
+    .astype(str)
+)
 
-# statuses = sorted(df["Read_status"].unique())
+st.markdown("""
+<style>
+.metric-card {
+    padding: 20px;
+    border-radius: 12px;
+    background-color: #f7f7f7;
+    border: 1px solid #e5e5e5;
+}
+.metric-title {
+    font-size: 14px;
+    color: #666;
+}
+.metric-value {
+    font-size: 30px;
+    font-weight: 700;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# selected_statuses = st.sidebar.multiselect(
-#     "Status",
-#     statuses,
-#     default=statuses
-# )
+st.sidebar.header("Filters")
 
-# min_date = df["sent_at"].min().date()
-# max_date = df["sent_at"].max().date()
 
-# date_range = st.sidebar.date_input(
-#     "Date Range",
-#     value=(min_date, max_date),
-#     min_value=min_date,
-#     max_value=max_date
-# )
+templates = sorted(df["template_name"].unique())
 
-# filtered = df[
+selected_templates = st.sidebar.multiselect(
+    "Template",
+    templates,
+    default=templates
+)
+
+statuses = sorted(df["Read_status"].unique())
+
+selected_statuses = st.sidebar.multiselect(
+    "Status",
+    statuses,
+    default=statuses
+)
+
+min_date = df["sent_at"].min().date()
+max_date = df["sent_at"].max().date()
+
+date_range = st.sidebar.date_input(
+    "Date Range",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date
+)
+
+filtered = df[
     
-#     df["template_name"].isin(selected_templates)
-#     & df["Read_status"].isin(selected_statuses)
-# ].copy()
+    df["template_name"].isin(selected_templates)
+    & df["Read_status"].isin(selected_statuses)
+].copy()
 
-# if len(date_range) == 2:
-#     start_date, end_date = date_range
+if len(date_range) == 2:
+    start_date, end_date = date_range
 
-#     filtered = filtered[
-#         (filtered["sent_at"].dt.date >= start_date)
-#         & (filtered["sent_at"].dt.date <= end_date)
-#     ]
+    filtered = filtered[
+        (filtered["sent_at"].dt.date >= start_date)
+        & (filtered["sent_at"].dt.date <= end_date)
+    ]
 
-# total_messages = len(filtered)
+total_messages = len(filtered)
 
-# unique_numbers = filtered["phone_number"].nunique()
+unique_numbers = filtered["phone_number"].nunique()
 
-# read_messages = len(
-#     filtered[
-#         filtered["Read_status"].isin(
-#             ["READ", "DELIVERED"]
-#         )
-#     ]
-# )
+read_messages = len(
+    filtered[
+        filtered["Read_status"].isin(
+            ["READ", "DELIVERED"]
+        )
+    ]
+)
 
-# unread_messages = len(
-#     filtered[
-#         filtered["Read_status"].isin(
-#             ["UNREAD", "SENT", "PENDING"]
-#         )
-#     ]
-# )
+unread_messages = len(
+    filtered[
+        filtered["Read_status"].isin(
+            ["UNREAD", "SENT", "PENDING"]
+        )
+    ]
+)
 
-# st.markdown("### Overview")
+st.markdown("### Overview")
 
-# c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4 = st.columns(4)
 
-# with c1:
-#     st.metric(
-#         "Total Messages",
-#         f"{total_messages:,}"
-#     )
+with c1:
+    st.metric(
+        "Total Messages",
+        f"{total_messages:,}"
+    )
 
-# with c2:
-#     st.metric(
-#         "Unique Contacts",
-#         f"{unique_numbers:,}"
-#     )
+with c2:
+    st.metric(
+        "Unique Contacts",
+        f"{unique_numbers:,}"
+    )
 
-# with c3:
-#     st.metric(
-#         "Read / Delivered",
-#         f"{read_messages:,}"
-#     )
+with c3:
+    st.metric(
+        "Read / Delivered/sent",
+        f"{read_messages+unread_messages:,}"
+    )
 
-# with c4:
-#     st.metric(
-#         "Unread / Pending",
-#         f"{unread_messages:,}"
-#     )
+with c4:
+    st.metric(
+        "Failed",
+        f"{(total_messages)-(read_messages+unread_messages)}"
+    )
 
-# st.divider()
+st.divider()
 
-# left, right = st.columns(2)
+left, right = st.columns(2)
 
-# with left:
+with left:
 
-#     st.subheader("📊 Messages by Status")
+    st.subheader("📊 Messages by Status")
 
-#     status_chart = (
-#         filtered["Read_status"]
-#         .value_counts()
-#         .rename_axis("Status")
-#         .reset_index(name="Messages")
-#     )
+    status_chart = (
+        filtered["Read_status"]
+        .value_counts()
+        .rename_axis("Status")
+        .reset_index(name="Messages")
+    )
 
-#     st.bar_chart(
-#         status_chart.set_index("Status")
-#     )
+    st.bar_chart(
+        status_chart.set_index("Status")
+    )
 
 
-# st.divider()
+st.divider()
 
-# left, right = st.columns(2)
+left, right = st.columns(2)
 
-# with left:
+with left:
 
-#     st.subheader("📨 Messages by Template")
+    st.subheader("📨 Messages by Template")
 
-#     template_chart = (
-#         filtered["template_name"]
-#         .value_counts()
-#         .rename_axis("Template")
-#         .reset_index(name="Messages")
-#     )
+    template_chart = (
+        filtered["template_name"]
+        .value_counts()
+        .rename_axis("Template")
+        .reset_index(name="Messages")
+    )
 
-#     st.bar_chart(
-#         template_chart.set_index("Template")
-#     )
+    st.bar_chart(
+        template_chart.set_index("Template")
+    )
 
-# with right:
+with right:
 
-#     st.subheader("📅 Daily Message Activity")
+    st.subheader("📅 Daily Message Activity")
 
-#     daily = (
-#         filtered
-#         .set_index("sent_at")
-#         .resample("D")
-#         .size()
-#         .rename("Messages")
-#     )
+    daily = (
+        filtered
+        .set_index("sent_at")
+        .resample("D")
+        .size()
+        .rename("Messages")
+    )
 
-#     st.line_chart(daily)
+    st.line_chart(daily)
 
-# st.divider()
+st.divider()
 
-# st.subheader("🕐 Recent Messages")
+st.subheader("🕐 Recent Messages")
 
-# recent = (
-#     filtered
-#     .sort_values("sent_at", ascending=False)
+recent = (
+    filtered
+    .sort_values("sent_at", ascending=False)
     
-# )
+)
 
-# display_columns = ["name",
-#     "phone_number",
-#     "template_name",
-#     "sent_at",
-#     "Read_status"
-# ]
+display_columns = ["name",
+    "phone_number",
+    "template_name",
+    "sent_at",
+    "Read_status"
+]
 
-# display_columns = [
-#     c for c in display_columns
-#     if c in recent.columns
-# ]
+display_columns = [
+    c for c in display_columns
+    if c in recent.columns
+]
 
-# st.dataframe(
-#     recent[display_columns],
-#     use_container_width=True,
-#     hide_index=True
-# )
+st.dataframe(
+    recent[display_columns],
+    use_container_width=True,
+    hide_index=True
+)

@@ -2,7 +2,6 @@ import streamlit as st
 from supabase import create_client
 from utils.contact_dialog import edit_contact,show_contact,whastapp
 import base64
-import os
 st.markdown("""
 <style>
 
@@ -150,10 +149,8 @@ st.set_page_config(
     layout="wide"
 )
 
-
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-
+SUPABASE_URL = "https://lbiioyctwrwxwwbnaewa.supabase.co"
+SUPABASE_KEY = "sb_publishable_4ASf43j7RR3rE2c-DumiIg_4Tc5UvqH"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -216,7 +213,7 @@ c1, c2, c3 = st.columns([1,6,1])
 
 with c1:
     if st.button("⬅ Back"):
-        st.switch_page("pages/2_View_Companies.py")
+        st.switch_page("pages/2_View_companies.py")
 
 with c2:
     st.markdown(f"# {company['company_name']}")
@@ -634,82 +631,62 @@ with col2:
 st.divider()
 st.header("Company Contacts")
 
-pages = st.selectbox("Pages:", [25, 50, 100, 200])
+PAGE_SIZE = st.selectbox("Pages:", [25, 50, 100, 200], key="contact_pages")
 
-PAGE_SIZE = pages
+company_name = (company.get("company_name") or "").strip()
 
-if "contact_page" not in st.session_state:
+if st.session_state.get("contact_company_name") != company_name:
     st.session_state.contact_page = 0
-
-if st.session_state.get("contact_company_name") != company["company_name"]:
-    st.session_state.contact_page = 0
-    st.session_state.contact_company_name = company["company_name"]
+    st.session_state.contact_company_name = company_name
 
 page = st.session_state.contact_page
 
-start = page * PAGE_SIZE
-end = start + PAGE_SIZE - 1
-
-
-# Find DINs for this company from visual_table
 visual_response = (
-    supabase
-    .table("visual_table")
-    .select("din")
-    .eq("company_name", company["company_name"])
+    supabase.table("visual_table")
+    .select("director_name")
+    .eq("company_name", company_name)
     .execute()
 )
 
-dins = [
-    str(row["din"]).strip()
+director_names = list(dict.fromkeys(
+    row["director_name"].strip()
     for row in (visual_response.data or [])
-    if row.get("din") is not None
-]
+    if row.get("director_name") and row["director_name"].strip()
+))
 
+st.write(
+    f"Company: {company_name} | Directors: {len(director_names)}"
+)
 
-# Find contacts using DIN
-if dins:
+if not director_names:
+    st.info("No directors found in visual_table.")
+
+else:
+    conditions = ",".join(
+        f'name.ilike."{name.replace(chr(34), "")}"'
+        for name in director_names
+    )
+
     response = (
-        supabase
-        .table("company_contacts")
+        supabase.table("company_contacts")
         .select("*", count="exact")
-        .in_("din", dins)
-        .range(start, end)
+        .or_(conditions)
+        .not_.is_("phone", "null")
+        .neq("phone", "")
+        .range(
+            page * PAGE_SIZE,
+            (page + 1) * PAGE_SIZE - 1
+        )
         .execute()
     )
 
     contacts = response.data or []
     total_contacts = response.count or 0
-else:
-    contacts = []
-    total_contacts = 0
 
+    st.write(f"Contacts with phone numbers: {total_contacts}")
 
-if not contacts:
-
-    st.info("No contacts added yet.")
-
-else:
-
-    st.markdown("""
-    <style>
-
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 18px !important;
-        border: 1px solid rgba(128,128,128,0.20) !important;
-        padding: 10px 12px !important;
-        margin-bottom: 16px !important;
-        transition: all 0.25s ease !important;
-    }
-
-    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-        transform: translateY(-3px);
-        border-color: rgba(37,99,235,0.35) !important;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;
-    }
-
-    </style>
-    """, unsafe_allow_html=True)
+    if not contacts:
+        st.info("No matching contacts with phone numbers found.")
 
     for contact in contacts:
 
@@ -720,22 +697,24 @@ else:
             with c1:
 
                 if contact.get("tags") == "Verified":
-                    badge = '<span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:15px;font-size:12px;font-weight:600;margin-left:8px;">✓ Verified</span>'
+                    badge = '<span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:15px;font-size:12px;font-weight:600;">✓ Verified</span>'
                 else:
-                    badge = '<span style="background:#f3f4f6;color:#6b7280;padding:3px 10px;border-radius:15px;font-size:12px;font-weight:600;margin-left:8px;">Unverified</span>'
+                    badge = '<span style="background:#f3f4f6;color:#6b7280;padding:3px 10px;border-radius:15px;font-size:12px;font-weight:600;">Unverified</span>'
 
-                html = (
-                    '<div style="font-size:18px;font-weight:600;">'
-                    + (contact.get("name") or "-")
-                    + " "
-                    + badge
-                    + "</div>"
-                    + f'<div style="color:#6b7280;">{contact.get("designation") or "-"} • {contact.get("department") or "-"}</div>'
-                    + f'<div>📧 {contact.get("email") or "-"}</div>'
-                    + f'<div>📞 {contact.get("phone") or "-"}</div>'
+                st.markdown(
+                    f"""
+                    <div style="font-size:18px;font-weight:600;">
+                        {contact.get('name') or '-'} {badge}
+                    </div>
+                    <div style="color:#6b7280;">
+                        {contact.get('designation') or '-'} •
+                        {contact.get('department') or '-'}
+                    </div>
+                    <div>📧 {contact.get('email') or '-'}</div>
+                    <div>📞 {contact.get('phone') or '-'}</div>
+                    """,
+                    unsafe_allow_html=True
                 )
-
-                st.markdown(html, unsafe_allow_html=True)
 
             with c2:
 
@@ -775,17 +754,11 @@ else:
                     type="tertiary",
                     use_container_width=True
                 ):
-                    whastapp(
-                        contact,
-                        company.get("company_name")
-                    )
+                    whastapp(contact, company_name)
 
+    total_pages = (total_contacts + PAGE_SIZE - 1) // PAGE_SIZE
 
-    if total_contacts > PAGE_SIZE:
-
-        total_pages = (
-            total_contacts + PAGE_SIZE - 1
-        ) // PAGE_SIZE
+    if total_pages > 1:
 
         st.divider()
 
@@ -805,7 +778,7 @@ else:
 
             st.markdown(
                 f"""
-                <div style="text-align:center; padding-top:8px;">
+                <div style="text-align:center;padding-top:8px;">
                     Page <b>{page + 1}</b> of <b>{total_pages}</b>
                     &nbsp; • &nbsp;
                     {total_contacts} contacts
@@ -823,5 +796,3 @@ else:
             ):
                 st.session_state.contact_page += 1
                 st.rerun()
-
-        st.divider()

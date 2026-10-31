@@ -631,7 +631,11 @@ with col2:
 st.divider()
 st.header("Company Contacts")
 
-PAGE_SIZE = st.selectbox("Pages:", [25, 50, 100, 200], key="contact_pages")
+PAGE_SIZE = st.selectbox(
+    "Pages:",
+    [25, 50, 100, 200],
+    key="contact_pages"
+)
 
 company_name = (company.get("company_name") or "").strip()
 
@@ -654,41 +658,69 @@ director_names = list(dict.fromkeys(
     if row.get("director_name") and row["director_name"].strip()
 ))
 
-st.write(
-    f"Company: {company_name} | Directors: {len(director_names)}"
-)
+st.write(f"Company: {company_name}")
+st.write(f"Directors: {len(director_names)}")
 
 if not director_names:
     st.info("No directors found in visual_table.")
 
 else:
-    conditions = ",".join(
-        f'name.ilike."{name.replace(chr(34), "")}"'
-        for name in director_names
-    )
+    all_contacts = []
+    start = 0
+    batch_size = 1000
 
-    response = (
-        supabase.table("company_contacts")
-        .select("*", count="exact")
-        .or_(conditions)
-        .not_.is_("phone", "null")
-        .neq("phone", "")
-        .range(
-            page * PAGE_SIZE,
-            (page + 1) * PAGE_SIZE - 1
+    while True:
+        response = (
+            supabase.table("company_contacts")
+            .select("*")
+            .not_.is_("phone", "null")
+            .neq("phone", "")
+            .range(start, start + batch_size - 1)
+            .execute()
         )
-        .execute()
+
+        batch = response.data or []
+
+        if not batch:
+            break
+
+        all_contacts.extend(batch)
+
+        if len(batch) < batch_size:
+            break
+
+        start += batch_size
+
+    director_name_set = set(director_names)
+
+    contacts = [
+        contact
+        for contact in all_contacts
+        if contact.get("name") in director_name_set
+    ]
+
+    contacts.sort(
+        key=lambda x: x.get("name", "")
     )
 
-    contacts = response.data or []
-    total_contacts = response.count or 0
+    total_contacts = len(contacts)
 
-    st.write(f"Contacts with phone numbers: {total_contacts}")
+    st.write(f"Exact case-sensitive matches with phone: {total_contacts}")
 
-    if not contacts:
-        st.info("No matching contacts with phone numbers found.")
+    total_pages = max(
+        1,
+        (total_contacts + PAGE_SIZE - 1) // PAGE_SIZE
+    )
 
-    for contact in contacts:
+    start_index = page * PAGE_SIZE
+    end_index = start_index + PAGE_SIZE
+
+    page_contacts = contacts[start_index:end_index]
+
+    if not page_contacts:
+        st.info("No exact matching contacts with phone numbers found.")
+
+    for contact in page_contacts:
 
         with st.container(border=True):
 
@@ -730,7 +762,6 @@ else:
                 b1, b2 = st.columns(2)
 
                 with b1:
-
                     if st.button(
                         "Details",
                         key=f"details_{contact['id']}",
@@ -739,7 +770,6 @@ else:
                         show_contact(contact)
 
                 with b2:
-
                     if st.button(
                         "Edit",
                         key=f"edit_{contact['id']}",
@@ -756,8 +786,6 @@ else:
                 ):
                     whastapp(contact, company_name)
 
-    total_pages = (total_contacts + PAGE_SIZE - 1) // PAGE_SIZE
-
     if total_pages > 1:
 
         st.divider()
@@ -765,7 +793,6 @@ else:
         col1, col2, col3 = st.columns([1, 2, 1])
 
         with col1:
-
             if st.button(
                 "← Previous",
                 disabled=page == 0,
@@ -775,7 +802,6 @@ else:
                 st.rerun()
 
         with col2:
-
             st.markdown(
                 f"""
                 <div style="text-align:center;padding-top:8px;">
@@ -788,7 +814,6 @@ else:
             )
 
         with col3:
-
             if st.button(
                 "Next →",
                 disabled=page >= total_pages - 1,

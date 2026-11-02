@@ -628,6 +628,8 @@ with col2:
     if st.button("Add Director"):
         add_director()
         
+
+
 st.divider()
 st.header("Company Contacts")
 
@@ -643,183 +645,276 @@ if st.session_state.get("contact_company_name") != company_name:
     st.session_state.contact_page = 0
     st.session_state.contact_company_name = company_name
 
-page = st.session_state.contact_page
+page = st.session_state.get("contact_page", 0)
 
 visual_response = (
     supabase.table("visual_table")
-    .select("director_name")
+    .select("id,din,director_name")
     .eq("company_name", company_name)
     .execute()
 )
 
-director_names = list(dict.fromkeys(
-    row["director_name"].strip()
-    for row in (visual_response.data or [])
-    if row.get("director_name") and row["director_name"].strip()
-))
+director_rows = visual_response.data or []
+
+directors = {}
+
+for row in director_rows:
+    name = (row.get("director_name") or "").strip()
+    din = (row.get("din") or "").strip()
+
+    if not name and not din:
+        continue
+
+    key = din if din else name.casefold()
+
+    if key not in directors:
+        directors[key] = {
+            "name": name,
+            "din": din
+        }
+
+director_list = list(directors.values())
 
 st.write(f"Company: {company_name}")
-st.write(f"Directors: {len(director_names)}")
+st.write(f"Directors: {len(director_list)}")
 
-if not director_names:
-    st.info("No directors found in visual_table.")
+if not director_list:
+    st.info("No directors found.")
+    st.stop()
 
-else:
-    all_contacts = []
-    start = 0
-    batch_size = 1000
+director_dins = list(dict.fromkeys(
+    d["din"] for d in director_list if d["din"]
+))
 
-    while True:
+director_names = list(dict.fromkeys(
+    d["name"] for d in director_list if d["name"]
+))
+
+contacts_by_din = {}
+contacts_by_name = {}
+
+def fetch_contacts_by_column(column, values):
+    results = []
+
+    for i in range(0, len(values), 50):
+        chunk = values[i:i + 50]
+
+        if not chunk:
+            continue
+
         response = (
             supabase.table("company_contacts")
-            .select("*", count="exact")
-            .or_(conditions)
-            .range(
-                page * PAGE_SIZE,
-                (page + 1) * PAGE_SIZE - 1
-            )
+            .select("*")
+            .in_(column, chunk)
             .execute()
         )
 
-        batch = response.data or []
+        results.extend(response.data or [])
 
-        if not batch:
-            break
+    return results
 
-        all_contacts.extend(batch)
 
-        if len(batch) < batch_size:
-            break
+din_contacts = fetch_contacts_by_column("din", director_dins)
+name_contacts = fetch_contacts_by_column("name", director_names)
 
-        start += batch_size
+for contact in din_contacts:
+    din = (contact.get("din") or "").strip()
 
-    director_name_set = set(director_names)
+    if din:
+        contacts_by_din.setdefault(din, []).append(contact)
 
-    contacts = [
-        contact
-        for contact in all_contacts
-        if contact.get("name") in director_name_set
+for contact in name_contacts:
+    name = (contact.get("name") or "").strip().casefold()
+
+    if name:
+        contacts_by_name.setdefault(name, []).append(contact)
+
+merged_contacts = []
+
+for director in director_list:
+
+    name = director["name"]
+    din = director["din"]
+
+    din_matches = contacts_by_din.get(din, []) if din else []
+
+    name_matches = contacts_by_name.get(name.casefold(), []) if name else []
+
+    candidates = din_matches + [
+        c for c in name_matches
+        if c.get("id") not in {x.get("id") for x in din_matches}
     ]
 
-    contacts.sort(
-        key=lambda x: x.get("name", "")
+    if not candidates:
+        continue
+
+    candidates.sort(
+        key=lambda c: (
+            bool(din and (c.get("din") or "").strip() == din),
+            sum(
+                bool(c.get(field))
+                for field in ["email", "phone", "city", "state"]
+            ),
+            c.get("created_at") or ""
+        ),
+        reverse=True
     )
 
-    total_contacts = len(contacts)
+    primary = candidates[0].copy()
 
-    st.write(f"Exact case-sensitive matches with phone: {total_contacts}")
+    primary["name"] = name or primary.get("name")
+    primary["din"] = din or primary.get("din")
 
-    total_pages = max(
-        1,
-        (total_contacts + PAGE_SIZE - 1) // PAGE_SIZE
-    )
+    for contact in candidates[1:]:
+        for field in [
+            "email",
+            "phone",
+            "street_address_1",
+            "street_address_2",
+            "city",
+            "state",
+            "zip_code",
+            "country",
+            "designation",
+            "department",
+            "linkedin",
+            "salesperson",
+            "reference",
+            "notes",
+            "remarks",
+            "tags"
+        ]:
+            if not primary.get(field) and contact.get(field):
+                primary[field] = contact[field]
 
-    start_index = page * PAGE_SIZE
-    end_index = start_index + PAGE_SIZE
+    primary["_matched_ids"] = [
+        c.get("id") for c in candidates if c.get("id")
+    ]
 
-    page_contacts = contacts[start_index:end_index]
+    merged_contacts.append(primary)
 
-    if not page_contacts:
-        st.info("No exact matching contacts with phone numbers found.")
+merged_contacts.sort(
+    key=lambda x: (x.get("name") or "").casefold()
+)
 
-    for contact in page_contacts:
+total_contacts = len(merged_contacts)
 
-        with st.container(border=True):
+st.write(f"Matching contacts: {total_contacts}")
 
-            c1, c2, c3 = st.columns([5, 2, 2])
+total_pages = max(
+    1,
+    (total_contacts + PAGE_SIZE - 1) // PAGE_SIZE
+)
 
-            with c1:
+if page >= total_pages:
+    page = 0
+    st.session_state.contact_page = 0
 
-                if contact.get("tags") == "Verified":
-                    badge = '<span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:15px;font-size:12px;font-weight:600;">✓ Verified</span>'
-                else:
-                    badge = '<span style="background:#f3f4f6;color:#6b7280;padding:3px 10px;border-radius:15px;font-size:12px;font-weight:600;">Unverified</span>'
+start_index = page * PAGE_SIZE
+page_contacts = merged_contacts[start_index:start_index + PAGE_SIZE]
 
-                st.markdown(
-                    f"""
-                    <div style="font-size:18px;font-weight:600;">
-                        {contact.get('name') or '-'} {badge}
-                    </div>
-                    <div style="color:#6b7280;">
-                        {contact.get('designation') or '-'} •
-                        {contact.get('department') or '-'}
-                    </div>
-                    <div>📧 {contact.get('email') or '-'}</div>
-                    <div>📞 {contact.get('phone') or '-'}</div>
-                    """,
-                    unsafe_allow_html=True
-                )
+if not page_contacts:
+    st.info("No matching contacts found.")
 
-            with c2:
+for contact in page_contacts:
 
-                st.caption("Location")
+    with st.container(border=True):
 
-                st.write(
-                    f"{contact.get('city') or '-'}, "
-                    f"{contact.get('state') or '-'}"
-                )
+        c1, c2, c3 = st.columns([5, 2, 2])
 
-            with c3:
+        with c1:
 
-                b1, b2 = st.columns(2)
+            if contact.get("tags") == "Verified":
+                badge = '<span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:15px;font-size:12px;font-weight:600;">✓ Verified</span>'
+            else:
+                badge = '<span style="background:#f3f4f6;color:#6b7280;padding:3px 10px;border-radius:15px;font-size:12px;font-weight:600;">Unverified</span>'
 
-                with b1:
-                    if st.button(
-                        "Details",
-                        key=f"details_{contact['id']}",
-                        use_container_width=True
-                    ):
-                        show_contact(contact)
-
-                with b2:
-                    if st.button(
-                        "Edit",
-                        key=f"edit_{contact['id']}",
-                        use_container_width=True
-                    ):
-                        edit_contact(contact, supabase)
-
-                if st.button(
-                    "WhatsApp",
-                    icon=":material/chat:",
-                    key=f"whatsapp_{contact['id']}",
-                    type="tertiary",
-                    use_container_width=True
-                ):
-                    whastapp(contact, company_name)
-
-    if total_pages > 1:
-
-        st.divider()
-
-        col1, col2, col3 = st.columns([1, 2, 1])
-
-        with col1:
-            if st.button(
-                "← Previous",
-                disabled=page == 0,
-                use_container_width=True
-            ):
-                st.session_state.contact_page -= 1
-                st.rerun()
-
-        with col2:
             st.markdown(
                 f"""
-                <div style="text-align:center;padding-top:8px;">
-                    Page <b>{page + 1}</b> of <b>{total_pages}</b>
-                    &nbsp; • &nbsp;
-                    {total_contacts} contacts
+                <div style="font-size:18px;font-weight:600;">
+                    {contact.get('name') or '-'} {badge}
                 </div>
+                <div style="color:#6b7280;">
+                    {contact.get('designation') or '-'} •
+                    {contact.get('department') or '-'}
+                </div>
+                <div>📧 {contact.get('email') or '-'}</div>
+                <div>📞 {contact.get('phone') or '-'}</div>
+                <div><b>DIN:</b> {contact.get('din') or '-'}</div>
                 """,
                 unsafe_allow_html=True
             )
 
-        with col3:
+        with c2:
+
+            st.caption("Location")
+
+            st.write(
+                f"{contact.get('city') or '-'}, "
+                f"{contact.get('state') or '-'}"
+            )
+
+        with c3:
+
+            b1, b2 = st.columns(2)
+
+            with b1:
+                if st.button(
+                    "Details",
+                    key=f"details_{contact['id']}",
+                    use_container_width=True
+                ):
+                    show_contact(contact)
+
+            with b2:
+                if st.button(
+                    "Edit",
+                    key=f"edit_{contact['id']}",
+                    use_container_width=True
+                ):
+                    edit_contact(contact, supabase)
+
             if st.button(
-                "Next →",
-                disabled=page >= total_pages - 1,
+                "WhatsApp",
+                icon=":material/chat:",
+                key=f"whatsapp_{contact['id']}",
+                type="tertiary",
                 use_container_width=True
             ):
-                st.session_state.contact_page += 1
-                st.rerun()
+                whastapp(contact, company_name)
+
+if total_pages > 1:
+
+    st.divider()
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col1:
+        if st.button(
+            "← Previous",
+            disabled=page == 0,
+            use_container_width=True
+        ):
+            st.session_state.contact_page -= 1
+            st.rerun()
+
+    with col2:
+        st.markdown(
+            f"""
+            <div style="text-align:center;padding-top:8px;">
+                Page <b>{page + 1}</b> of <b>{total_pages}</b>
+                &nbsp; • &nbsp;
+                {total_contacts} contacts
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with col3:
+        if st.button(
+            "Next →",
+            disabled=page >= total_pages - 1,
+            use_container_width=True
+        ):
+            st.session_state.contact_page += 1
+            st.rerun()

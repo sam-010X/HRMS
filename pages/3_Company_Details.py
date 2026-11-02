@@ -672,10 +672,12 @@ else:
     while True:
         response = (
             supabase.table("company_contacts")
-            .select("*")
-            .not_.is_("phone", "null")
-            .neq("phone", "")
-            .range(start, start + batch_size - 1)
+            .select("*", count="exact")
+            .or_(conditions)
+            .range(
+                page * PAGE_SIZE,
+                (page + 1) * PAGE_SIZE - 1
+            )
             .execute()
         )
 
